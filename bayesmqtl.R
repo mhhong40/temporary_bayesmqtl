@@ -80,4 +80,6 @@ bayesmqtl <- function(Y, X, z, bin_ind, mix_prop, alpha_0, beta_0, alpha_1, beta
 
   if(verbose) cat("... done. == \n\n")
   # % #
+
+  vb
 }
