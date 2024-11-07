@@ -13,14 +13,16 @@ update_sig2_theta_vb_ <- function(n, tau_vb, sig2_vb, c = 1) { # should be matri
 }
 
 ## tau's updates
-update_eta_vb_ <- function(n, eta, c = 1) c * (n/2 + eta - 1)
+update_eta_vb_ <- function(n, eta, c = 1) c * (n/2 + eta - 1) + 1
 
-update_kappa_vb_ <- function(z, kappa, mat_x_m1, theta_vb, c = 1) {
+update_kappa_vb_ <- function(z, kappa, mat_x_m1, m2_theta, theta_vb, c = 1) {
 
   n <- nrow(z)
 
+  ## Added (n - 1) * colSums(m2_theta) to account for posterior E(theta^2)
   c * (kappa + ( colSums(z^2) - 2 * colSums(z * mat_x_m1)  +
-                   colSums(mat_x_m1^2) + (n - 1) * colSums(theta_vb^2) )/ 2)
+                   colSums(mat_x_m1^2) + (n - 1) * colSums(m2_theta) -
+                   (n - 1) * colSums(theta_vb^2) )/ 2)
 }
 
 update_log_tau_vb_ <- function(eta_vb, kappa_vb) digamma(eta_vb) - log(kappa_vb)
