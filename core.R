@@ -27,7 +27,7 @@ bayesmqtl_core_ <- function(z, X, lambda, eta, kappa, tau,
 
   tau_vb <- tau
   theta_vb <- mu_theta_vb <- theta # two objects are created to make the computations in C++ Eigen easier
-  sig2_theta_vb <- sig2_theta
+  sig2_theta_vb <- matrix(rep(sig2_theta, d), ncol = d)
 
   m2_theta <- update_m2_theta_vb_(mu_theta_vb, sig2_theta_vb)
 
@@ -46,21 +46,33 @@ bayesmqtl_core_ <- function(z, X, lambda, eta, kappa, tau,
 
     # % #
     eta_vb <- update_eta_vb_(n, eta, c = c)
-    kappa_vb <- update_kappa_vb_(z, kappa, mat_x_m1, theta_vb, m2_theta, c = c)
+    kappa_vb <- update_kappa_vb_(z, kappa, mat_x_m1, theta_vb, c = c)
 
     tau_vb <- eta_vb / kappa_vb # this somehow became negative
     # % #
 
     # % #
     lambda_vb <- update_lambda_vb_(lambda, m2_theta, c)
-    sig2_vb <- 1 / lambda_vb
+    sig2_vb <- matrix(rep(1 / lambda_vb, d), ncol = d)
     # % #
 
     # % #
     sig2_theta_vb <- update_sig2_theta_vb_(n, tau_vb, sig2_vb, c)
 
-    coreLoop(z, X, mat_x_m1, theta_vb,
-             mu_theta_vb, tau_vb, sig2_theta_vb, c = c) # Updates theta_vb
+    for (s in 1:p) {
+
+      mat_x_m1 <- mat_x_m1 - tcrossprod(X[, s], theta_vb[s, ]) # take away the contribution of the sth predictor
+
+      mu_theta_vb[s, ] <- c * sig2_theta_vb[s, ] * tau_vb *
+        (t(z - mat_x_m1) %*% X[, s])
+
+      theta_vb[s, ] <- mu_theta_vb[s, ]
+
+      mat_x_m1 <- mat_x_m1 + tcrossprod(X[, s], theta_vb[s, ])
+    }
+
+    # coreLoop(z, X, mat_x_m1, theta_vb,
+    #         mu_theta_vb, tau_vb, sig2_theta_vb, c = c) # Updates theta_vb
     # % #
 
     m2_theta <- update_m2_theta_vb_(mu_theta_vb, sig2_theta_vb)
@@ -90,11 +102,12 @@ bayesmqtl_core_ <- function(z, X, lambda, eta, kappa, tau,
       lb_new <- elbo_(n, z, mat_x_m1, theta_vb, kappa, kappa_vb, log_tau_vb, m2_theta, tau_vb,
                       eta, eta_vb, sig2_theta_vb, log_sig2_theta_vb, lambda, lambda_vb, sig2_vb)
 
-      if (verbose & (it == 1 | it %% 5 == 0))
-        cat(paste0("ELBO = ", format(lb_new), "\n\n"))
+      if (verbose)
+        cat(paste0("ELBO = ", format(lb_new), "\n\n",
+                   "Difference in ELBO = ", format(abs(lb_new - lb_old)), "\n\n"))
 
-      if (lb_new + eps < lb_old)
-        stop("ELBO not increasing monotonically. Exit. ")
+      # if (lb_new + eps < lb_old)
+      #  stop("ELBO not increasing monotonically. Exit. ")
 
       converged <- (abs(lb_new - lb_old) < tol)
 
@@ -108,13 +121,14 @@ bayesmqtl_core_ <- function(z, X, lambda, eta, kappa, tau,
 
       if(converged) {
 
-        cat(paste0("Convergence obtained after", format(it), "interations. \n",
+        cat(paste0("Convergence obtained after ", format(it), " interations. \n",
                    "Optimal marginal log-likelihood variational lower bound ",
                    "(ELBO) = ", format(lb_new), ". \n\n"))
-      } else {
-
-        warning("Maximal number of iterations reached before convergence. Exit.")
       }
+      # else {
+
+      #  warning("Maximal number of iterations reached before convergence. Exit.")
+      # }
     }
 
   }
@@ -123,13 +137,10 @@ bayesmqtl_core_ <- function(z, X, lambda, eta, kappa, tau,
   lb_opt <- lb_new
 
   names_x <- colnames(X)
-  names_y <- colnames(Y)
+  names_z <- colnames(z)
 
-  rownames(theta_vb) <- names_x
-  colnames(theta_vb) <- names_y
-
-  # Fix this
-  names(sig2_theta_vb) <- names_x
+  rownames(theta_vb) <- rownames(sig2_theta_vb) <- names_x
+  colnames(theta_vb) <- colnames(sig2_theta_vb) <- names_z
 
   diff_lb <- abs(lb_opt - lb_old)
 
@@ -145,13 +156,13 @@ elbo_ <- function(n, z, mat_x_m1, theta_vb, kappa, kappa_vb, log_tau_vb, m2_thet
 
   n <- nrow(z)
 
-  eta_vb <- update_eta_vb_(n, eta)
-  kappa_vb <- update_kappa_vb_(z, kappa, mat_x_m1, theta_vb, m2_theta)
-  log_tau_vb <- digamma(eta_vb) - log(kappa_vb)
+  # eta_vb <- update_eta_vb_(n, eta)
+  # kappa_vb <- update_kappa_vb_(z, kappa, mat_x_m1, theta_vb, m2_theta)
+  # log_tau_vb <- digamma(eta_vb) - log(kappa_vb)
 
-  log_sig2_theta_vb <- log(sig2_theta_vb) - 1/2 # approximating E(log(sig2_theta))
+  # log_sig2_theta_vb <- log(sig2_theta_vb) - 1/2 # approximating E(log(sig2_theta))
 
-  lambda_vb <- update_lambda_vb_(lambda, m2_theta)
+  # lambda_vb <- update_lambda_vb_(lambda, m2_theta)
 
   elbo_A <- e_z_(n, kappa, kappa_vb, log_tau_vb, tau_vb)
 
