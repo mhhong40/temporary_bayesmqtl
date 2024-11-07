@@ -46,7 +46,7 @@ bayesmqtl_core_ <- function(z, X, lambda, eta, kappa, tau,
 
     # % #
     eta_vb <- update_eta_vb_(n, eta, c = c)
-    kappa_vb <- update_kappa_vb_(z, kappa, mat_x_m1, theta_vb, c = c)
+    kappa_vb <- update_kappa_vb_(z, kappa, mat_x_m1, m2_theta, theta_vb, c = c)
 
     tau_vb <- eta_vb / kappa_vb # this somehow became negative
     # % #
@@ -72,7 +72,7 @@ bayesmqtl_core_ <- function(z, X, lambda, eta, kappa, tau,
     }
 
     # coreLoop(z, X, mat_x_m1, theta_vb,
-    #         mu_theta_vb, tau_vb, sig2_theta_vb, c = c) # Updates theta_vb
+    #          mu_theta_vb, tau_vb, sig2_theta_vb, c = c) # Updates theta_vb
     # % #
 
     m2_theta <- update_m2_theta_vb_(mu_theta_vb, sig2_theta_vb)
@@ -156,21 +156,25 @@ elbo_ <- function(n, z, mat_x_m1, theta_vb, kappa, kappa_vb, log_tau_vb, m2_thet
 
   n <- nrow(z)
 
-  # eta_vb <- update_eta_vb_(n, eta)
-  # kappa_vb <- update_kappa_vb_(z, kappa, mat_x_m1, theta_vb, m2_theta)
-  # log_tau_vb <- digamma(eta_vb) - log(kappa_vb)
+  eta_vb <- update_eta_vb_(n, eta)
+  kappa_vb <- update_kappa_vb_(z, kappa, mat_x_m1, theta_vb, m2_theta)
+  log_tau_vb <- digamma(eta_vb) - log(kappa_vb)
 
-  # log_sig2_theta_vb <- log(sig2_theta_vb) - 1/2 # approximating E(log(sig2_theta))
+  log_sig2_theta_vb <- log(sig2_theta_vb) - 1/2 # approximating E(log(sig2_theta))
 
-  # lambda_vb <- update_lambda_vb_(lambda, m2_theta)
+  lambda_vb <- update_lambda_vb_(lambda, m2_theta)
 
-  elbo_A <- e_z_(n, kappa, kappa_vb, log_tau_vb, tau_vb)
+  elbo_A <- e_z_(n, kappa, kappa_vb, log_tau_vb, tau_vb, m2_theta)
+  cat(paste0("elbo_A = ", format(elbo_A), "\n"))
 
   elbo_B <- e_tau_(eta, eta_vb, kappa, kappa_vb, log_tau_vb, tau_vb)
+  cat(paste0("elbo_B = ", format(elbo_B), "\n"))
 
   elbo_C <- e_theta_(sig2_theta_vb, log_sig2_theta_vb, m2_theta)
+  cat(paste0("elbo_C = ", format(elbo_C), "\n"))
 
   elbo_D <- e_sig2_(lambda, lambda_vb, sig2_vb)
+  cat(paste0("elbo_D = ", format(elbo_D), "\n"))
 
   elbo_A + elbo_B + elbo_C + elbo_D
 
